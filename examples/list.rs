@@ -45,11 +45,17 @@ impl App {
         .collect();
         let mut state = ListState::default();
         state.select(Some(0));
-        App { rows, sort: Sortable::new(), state }
+        App {
+            rows,
+            sort: Sortable::new(),
+            state,
+        }
     }
 
     fn apply(&mut self, id: u64, slot: usize) {
-        let Some(idx) = self.rows.iter().position(|(k, _)| *k == id) else { return };
+        let Some(idx) = self.rows.iter().position(|(k, _)| *k == id) else {
+            return;
+        };
         let row = self.rows.remove(idx);
         let slot = slot.min(self.rows.len());
         self.rows.insert(slot, row);
@@ -59,7 +65,9 @@ impl App {
     fn on_mouse(&mut self, m: event::MouseEvent) {
         match self.sort.on_mouse(m) {
             Act::Drop { key, slot, .. } => self.apply(key, slot),
-            Act::Click(id) => self.state.select(self.rows.iter().position(|(k, _)| *k == id)),
+            Act::Click(id) => self
+                .state
+                .select(self.rows.iter().position(|(k, _)| *k == id)),
             _ => {}
         }
     }
@@ -98,7 +106,11 @@ impl App {
             .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(Color::DarkGray))
             .title(" a pour-over, in order ")
-            .title_style(Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD))
+            .title_style(
+                Style::default()
+                    .fg(Color::Gray)
+                    .add_modifier(Modifier::BOLD),
+            )
             .title_bottom(
                 Line::from(" space lifts · q quits ")
                     .style(Style::default().fg(Color::DarkGray))
@@ -122,8 +134,9 @@ impl App {
         if let Some(slot) = over {
             let slot = slot.min(lines.len());
             let line = match carried.and_then(|id| self.text_of(id)) {
-                Some(text) => Line::from(format!("  {text}"))
-                    .style(Style::default().fg(Color::Yellow)),
+                Some(text) => {
+                    Line::from(format!("  {text}")).style(Style::default().fg(Color::Yellow))
+                }
                 None => Line::from("  · · ·").style(Style::default().fg(Color::Cyan)),
             };
             lines.insert(slot, (None, line));
@@ -150,20 +163,22 @@ impl App {
         }
         f.render_stateful_widget(list, body, &mut self.state);
 
-        if let Some(g) = self.sort.ghost(f.area()) {
-            if let Some(text) = held.and_then(|id| self.text_of(id)) {
-                f.render_widget(Clear, g);
-                f.render_widget(
-                    Paragraph::new(format!("  {text}"))
-                        .style(Style::default().fg(Color::Yellow)),
-                    g,
-                );
-            }
+        if let Some(g) = self.sort.ghost(f.area())
+            && let Some(text) = held.and_then(|id| self.text_of(id))
+        {
+            f.render_widget(Clear, g);
+            f.render_widget(
+                Paragraph::new(format!("  {text}")).style(Style::default().fg(Color::Yellow)),
+                g,
+            );
         }
     }
 
     fn text_of(&self, id: u64) -> Option<String> {
-        self.rows.iter().find(|(k, _)| *k == id).map(|(_, t)| t.clone())
+        self.rows
+            .iter()
+            .find(|(k, _)| *k == id)
+            .map(|(_, t)| t.clone())
     }
 }
 

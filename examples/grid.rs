@@ -40,13 +40,22 @@ impl App {
             ("uranus", Color::Cyan),
             ("neptune", Color::LightBlue),
         ];
-        let tiles =
-            names.iter().enumerate().map(|(i, (n, c))| (i as u64 + 1, *n, *c)).collect();
-        App { tiles, sort: Sortable::new(), cursor: 0 }
+        let tiles = names
+            .iter()
+            .enumerate()
+            .map(|(i, (n, c))| (i as u64 + 1, *n, *c))
+            .collect();
+        App {
+            tiles,
+            sort: Sortable::new(),
+            cursor: 0,
+        }
     }
 
     fn apply(&mut self, id: u64, slot: usize) {
-        let Some(idx) = self.tiles.iter().position(|(k, ..)| *k == id) else { return };
+        let Some(idx) = self.tiles.iter().position(|(k, ..)| *k == id) else {
+            return;
+        };
         let tile = self.tiles.remove(idx);
         let slot = slot.min(self.tiles.len());
         self.tiles.insert(slot, tile);
@@ -110,7 +119,11 @@ impl App {
             .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(Color::DarkGray))
             .title(" nearest first ")
-            .title_style(Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD));
+            .title_style(
+                Style::default()
+                    .fg(Color::Gray)
+                    .add_modifier(Modifier::BOLD),
+            );
         let body = block.inner(board);
         f.render_widget(block, board);
 
@@ -120,8 +133,12 @@ impl App {
 
         // Reflow by hand: the held tile out, a hole in. Row-major with
         // a cell of air, which is all the "grid" there is.
-        let mut cells: Vec<Option<(u64, &str, Color)>> =
-            self.tiles.iter().filter(|(id, ..)| held != Some(*id)).map(|t| Some(*t)).collect();
+        let mut cells: Vec<Option<(u64, &str, Color)>> = self
+            .tiles
+            .iter()
+            .filter(|(id, ..)| held != Some(*id))
+            .map(|t| Some(*t))
+            .collect();
         if let Some(slot) = over {
             cells.insert(slot.min(cells.len()), None);
         }
@@ -162,11 +179,11 @@ impl App {
         }
         self.sort.container(0, body, &spots);
 
-        if let Some(g) = self.sort.ghost(f.area()) {
-            if let Some((name, color)) = held.and_then(|id| self.tile_of(id)) {
-                f.render_widget(Clear, g);
-                draw_tile(f, g, name, color, Color::Yellow);
-            }
+        if let Some(g) = self.sort.ghost(f.area())
+            && let Some((name, color)) = held.and_then(|id| self.tile_of(id))
+        {
+            f.render_widget(Clear, g);
+            draw_tile(f, g, name, color, Color::Yellow);
         }
 
         let hint = if held.is_some() {
@@ -181,7 +198,10 @@ impl App {
     }
 
     fn tile_of(&self, id: u64) -> Option<(&'static str, Color)> {
-        self.tiles.iter().find(|(k, ..)| *k == id).map(|(_, n, c)| (*n, *c))
+        self.tiles
+            .iter()
+            .find(|(k, ..)| *k == id)
+            .map(|(_, n, c)| (*n, *c))
     }
 }
 

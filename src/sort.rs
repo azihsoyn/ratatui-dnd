@@ -87,7 +87,11 @@ pub struct Sortable<C, K> {
 
 impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
     pub fn new() -> Self {
-        Self { drag: Drag::new(), carry: None, cons: Vec::new() }
+        Self {
+            drag: Drag::new(),
+            carry: None,
+            cons: Vec::new(),
+        }
     }
 
     /// Say where a container and its items are this frame, in drawing
@@ -100,7 +104,11 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
                 c.area = area;
                 c.items = items.to_vec();
             }
-            None => self.cons.push(Con { id, area, items: items.to_vec() }),
+            None => self.cons.push(Con {
+                id,
+                area,
+                items: items.to_vec(),
+            }),
         }
     }
 
@@ -118,7 +126,11 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
             Did::Lift(k) => Act::Lift(k),
             Did::Move => Act::Move,
             Did::Drop { key, x, y } => match self.place(x, y) {
-                Some((container, slot)) => Act::Drop { key, container, slot },
+                Some((container, slot)) => Act::Drop {
+                    key,
+                    container,
+                    slot,
+                },
                 None => Act::Nothing,
             },
         }
@@ -132,7 +144,11 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
         }
         for (ci, con) in self.cons.iter().enumerate() {
             if let Some(i) = con.items.iter().position(|(k, _)| *k == key) {
-                self.carry = Some(Carry { key, con: ci, slot: i });
+                self.carry = Some(Carry {
+                    key,
+                    con: ci,
+                    slot: i,
+                });
                 return;
             }
         }
@@ -280,7 +296,11 @@ mod tests {
 
     #[test]
     fn a_horizontal_strip_reads_by_horizontal_midlines() {
-        let row = vec![Rect::new(0, 2, 10, 3), Rect::new(12, 2, 10, 3), Rect::new(24, 2, 10, 3)];
+        let row = vec![
+            Rect::new(0, 2, 10, 3),
+            Rect::new(12, 2, 10, 3),
+            Rect::new(24, 2, 10, 3),
+        ];
         assert_eq!(slot(&row, 3, 3), 0);
         assert_eq!(slot(&row, 6, 3), 1);
         assert_eq!(slot(&row, 30, 3), 3);
@@ -308,16 +328,26 @@ mod tests {
 
     fn sortable() -> Sortable<&'static str, u8> {
         let mut s = Sortable::new();
-        s.container("left", Rect::new(0, 0, 24, 20), &[
-            (1, Rect::new(2, 1, 20, 3)),
-            (2, Rect::new(2, 5, 20, 3)),
-        ]);
-        s.container("right", Rect::new(26, 0, 24, 20), &[(3, Rect::new(28, 1, 20, 3))]);
+        s.container(
+            "left",
+            Rect::new(0, 0, 24, 20),
+            &[(1, Rect::new(2, 1, 20, 3)), (2, Rect::new(2, 5, 20, 3))],
+        );
+        s.container(
+            "right",
+            Rect::new(26, 0, 24, 20),
+            &[(3, Rect::new(28, 1, 20, 3))],
+        );
         s
     }
 
     fn mouse(kind: MouseEventKind, x: u16, y: u16) -> MouseEvent {
-        MouseEvent { kind, column: x, row: y, modifiers: KeyModifiers::empty() }
+        MouseEvent {
+            kind,
+            column: x,
+            row: y,
+            modifiers: KeyModifiers::empty(),
+        }
     }
 
     #[test]
@@ -329,7 +359,11 @@ mod tests {
         assert_eq!(s.over(), Some(("right", 1)));
         assert_eq!(
             s.on_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 30, 7)),
-            Act::Drop { key: 1, container: "right", slot: 1 }
+            Act::Drop {
+                key: 1,
+                container: "right",
+                slot: 1
+            }
         );
     }
 
@@ -340,7 +374,11 @@ mod tests {
         s.on_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), 60, 2));
         assert_eq!(
             s.on_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 60, 2)),
-            Act::Drop { key: 1, container: "right", slot: 1 }
+            Act::Drop {
+                key: 1,
+                container: "right",
+                slot: 1
+            }
         );
     }
 

@@ -62,7 +62,12 @@ impl App {
                     .collect()
             })
             .collect();
-        App { titles, lanes, sort: Sortable::new(), cursor: (0, 0) }
+        App {
+            titles,
+            lanes,
+            sort: Sortable::new(),
+            cursor: (0, 0),
+        }
     }
 
     fn to_lanes(&self) -> Vec<Lane> {
@@ -82,13 +87,19 @@ impl App {
             cards: cards.iter().map(|c| c.to_string()).collect(),
         };
         App::from(vec![
-            lane("todo", &[
-                "let a card be picked up",
-                "open a gap under the ghost",
-                "drop across columns",
-                "carry a card without a mouse",
-            ]),
-            lane("doing", &["hit-test the cards", "measure slots from real rects"]),
+            lane(
+                "todo",
+                &[
+                    "let a card be picked up",
+                    "open a gap under the ghost",
+                    "drop across columns",
+                    "carry a card without a mouse",
+                ],
+            ),
+            lane(
+                "doing",
+                &["hit-test the cards", "measure slots from real rects"],
+            ),
             lane("done", &["draw three columns"]),
         ])
     }
@@ -102,7 +113,9 @@ impl App {
 
     /// Move the card and put the keyboard's cursor where it landed.
     fn apply(&mut self, id: u64, lane: usize, slot: usize) {
-        let Some((src, idx)) = self.find(id) else { return };
+        let Some((src, idx)) = self.find(id) else {
+            return;
+        };
         let card = self.lanes[src].remove(idx);
         let slot = slot.min(self.lanes[lane].len());
         self.lanes[lane].insert(slot, card);
@@ -111,7 +124,11 @@ impl App {
 
     fn on_mouse(&mut self, m: event::MouseEvent) {
         match self.sort.on_mouse(m) {
-            Act::Drop { key, container, slot } => self.apply(key, container, slot),
+            Act::Drop {
+                key,
+                container,
+                slot,
+            } => self.apply(key, container, slot),
             Act::Click(id) => {
                 if let Some(at) = self.find(id) {
                     self.cursor = at;
@@ -161,7 +178,10 @@ impl App {
     }
 
     fn step_lane(&mut self, to: usize) {
-        self.cursor = (to, self.cursor.1.min(self.lanes[to].len().saturating_sub(1)));
+        self.cursor = (
+            to,
+            self.cursor.1.min(self.lanes[to].len().saturating_sub(1)),
+        );
     }
 
     fn render(&mut self, f: &mut ratatui::Frame) {
@@ -181,7 +201,11 @@ impl App {
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(Color::DarkGray))
                 .title(format!(" {} · {} ", self.titles[li], cards.len()))
-                .title_style(Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD));
+                .title_style(
+                    Style::default()
+                        .fg(Color::Gray)
+                        .add_modifier(Modifier::BOLD),
+                );
             let body = block.inner(areas[li]);
             f.render_widget(block, areas[li]);
 
@@ -232,11 +256,11 @@ impl App {
             }
         }
 
-        if let Some(g) = self.sort.ghost(f.area()) {
-            if let Some(text) = held.and_then(|id| self.text_of(id)) {
-                f.render_widget(Clear, g);
-                draw_card(f, g, &text, Color::Yellow);
-            }
+        if let Some(g) = self.sort.ghost(f.area())
+            && let Some(text) = held.and_then(|id| self.text_of(id))
+        {
+            f.render_widget(Clear, g);
+            draw_card(f, g, &text, Color::Yellow);
         }
 
         let hint = if self.sort.held().is_some() {

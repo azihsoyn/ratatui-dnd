@@ -24,18 +24,34 @@ pub enum Did<K> {
     /// The cursor moved while holding something.
     Move,
     /// Released while holding something, at this cell.
-    Drop { key: K, x: u16, y: u16 },
+    Drop {
+        key: K,
+        x: u16,
+        y: u16,
+    },
 }
 
 enum State<K> {
     Idle,
     /// Pressed on something but not yet moved: could still be a click,
     /// so nothing is lifted until the cursor leaves the press cell.
-    Armed { key: K, rect: Rect, x: u16, y: u16 },
+    Armed {
+        key: K,
+        rect: Rect,
+        x: u16,
+        y: u16,
+    },
     /// Holding it. `dx`/`dy` is where inside the thing it was grabbed,
     /// so a ghost can hang from the same point instead of snapping to
     /// its corner.
-    Moving { key: K, rect: Rect, dx: u16, dy: u16, x: u16, y: u16 },
+    Moving {
+        key: K,
+        rect: Rect,
+        dx: u16,
+        dy: u16,
+        x: u16,
+        y: u16,
+    },
 }
 
 /// The drag itself: feed it every mouse event plus what was under the
@@ -58,7 +74,12 @@ impl<K: Clone> Drag<K> {
             // the stuck drag ends here rather than living forever.
             MouseEventKind::Down(MouseButton::Left) => {
                 self.state = match hit {
-                    Some((key, rect)) => State::Armed { key, rect, x: ev.column, y: ev.row },
+                    Some((key, rect)) => State::Armed {
+                        key,
+                        rect,
+                        x: ev.column,
+                        y: ev.row,
+                    },
                     None => State::Idle,
                 };
                 Did::Nothing
@@ -81,9 +102,17 @@ impl<K: Clone> Drag<K> {
                         };
                         Did::Lift(lifted)
                     }
-                    State::Moving { key, rect, dx, dy, .. } => {
-                        self.state =
-                            State::Moving { key, rect, dx, dy, x: ev.column, y: ev.row };
+                    State::Moving {
+                        key, rect, dx, dy, ..
+                    } => {
+                        self.state = State::Moving {
+                            key,
+                            rect,
+                            dx,
+                            dy,
+                            x: ev.column,
+                            y: ev.row,
+                        };
                         Did::Move
                     }
                     State::Idle => Did::Nothing,
@@ -92,7 +121,11 @@ impl<K: Clone> Drag<K> {
             MouseEventKind::Up(MouseButton::Left) => {
                 match std::mem::replace(&mut self.state, State::Idle) {
                     State::Armed { key, .. } => Did::Click(key),
-                    State::Moving { key, .. } => Did::Drop { key, x: ev.column, y: ev.row },
+                    State::Moving { key, .. } => Did::Drop {
+                        key,
+                        x: ev.column,
+                        y: ev.row,
+                    },
                     State::Idle => Did::Nothing,
                 }
             }
@@ -124,13 +157,22 @@ impl<K: Clone> Drag<K> {
     /// Where to draw the held thing: its own size, hanging from the grab
     /// point, and never past the edges of `within`.
     pub fn ghost(&self, within: Rect) -> Option<Rect> {
-        let State::Moving { rect, dx, dy, x, y, .. } = &self.state else {
+        let State::Moving {
+            rect, dx, dy, x, y, ..
+        } = &self.state
+        else {
             return None;
         };
         let w = rect.width.min(within.width);
         let h = rect.height.min(within.height);
-        let gx = x.saturating_sub(*dx).max(within.x).min(within.x + within.width - w);
-        let gy = y.saturating_sub(*dy).max(within.y).min(within.y + within.height - h);
+        let gx = x
+            .saturating_sub(*dx)
+            .max(within.x)
+            .min(within.x + within.width - w);
+        let gy = y
+            .saturating_sub(*dy)
+            .max(within.y)
+            .min(within.y + within.height - h);
         Some(Rect::new(gx, gy, w, h))
     }
 }
@@ -184,7 +226,12 @@ mod tests {
     use crossterm::event::KeyModifiers;
 
     fn ev(kind: MouseEventKind, x: u16, y: u16) -> MouseEvent {
-        MouseEvent { kind, column: x, row: y, modifiers: KeyModifiers::empty() }
+        MouseEvent {
+            kind,
+            column: x,
+            row: y,
+            modifiers: KeyModifiers::empty(),
+        }
     }
 
     fn down(x: u16, y: u16) -> MouseEvent {
@@ -202,7 +249,10 @@ mod tests {
     #[test]
     fn press_and_release_is_a_click() {
         let mut d: Drag<u8> = Drag::new();
-        assert_eq!(d.on_mouse(down(5, 5), Some((7, Rect::new(4, 4, 10, 3)))), Did::Nothing);
+        assert_eq!(
+            d.on_mouse(down(5, 5), Some((7, Rect::new(4, 4, 10, 3)))),
+            Did::Nothing
+        );
         assert_eq!(d.on_mouse(up(5, 5), None), Did::Click(7));
         assert!(d.moving().is_none());
     }
