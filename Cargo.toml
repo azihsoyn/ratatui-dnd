@@ -5,6 +5,7 @@ edition = "2024"
 description = "Drag and drop for ratatui: attach sorting to lists you already draw, with mouse or keyboard"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/azihsoyn/ratatui-dnd"
+exclude = ["demo.gif", ".github"]
 keywords = ["ratatui", "tui", "drag-and-drop", "sortable", "terminal"]
 categories = ["command-line-interface"]
 

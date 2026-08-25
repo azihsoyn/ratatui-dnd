@@ -3,6 +3,8 @@
 Drag and drop for [ratatui](https://ratatui.rs): attach sorting to lists
 you already draw, with mouse or keyboard.
 
+![a card dragged with the mouse, then carried with the keyboard, then the board printed as JSON](demo.gif)
+
 Think [SortableJS](https://github.com/SortableJS/Sortable), but for the
 terminal. This crate does not own your list, your kanban, or your grid —
 you keep drawing them however you do, with raw `Layout`, ratatui's own
