@@ -10,7 +10,8 @@
 //! where board.json is `[{"title": "todo", "cards": ["…", …]}, …]`.
 //!
 //! Mouse: drag cards. Keyboard: arrows move, space lifts, arrows carry,
-//! space drops, esc lets go. q quits and prints the board.
+//! space drops, esc lets go. x marks a card; grab any marked card and
+//! every marked card moves with it. q quits and prints the board.
 
 use anyhow::Result;
 use crossterm::event::{
@@ -21,6 +22,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, BorderType, Clear, Paragraph};
 use ratatui_dnd::{Act, Sortable};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::time::Duration;
 
 const TICK: Duration = Duration::from_millis(100);
@@ -44,6 +46,10 @@ struct App {
     sort: Sortable<usize, u64>,
     /// The keyboard's place on the board: (lane, card).
     cursor: (usize, usize),
+    /// Cards marked with `x`. The crate holds one handle; what a grab
+    /// of it takes along is the model's business, so a marked card
+    /// dragged anywhere brings the whole marked set.
+    marked: HashSet<u64>,
 }
 
 impl App {
@@ -67,6 +73,7 @@ impl App {
             lanes,
             sort: Sortable::new(),
             cursor: (0, 0),
+            marked: HashSet::new(),
         }
     }
 
@@ -111,14 +118,37 @@ impl App {
             .find_map(|(li, l)| l.iter().position(|c| c.id == id).map(|i| (li, i)))
     }
 
-    /// Move the card and put the keyboard's cursor where it landed.
+    /// Everything a grab of `id` takes along: the marked set when the
+    /// grabbed card is marked, otherwise just the card. Board order,
+    /// so a scattered selection lands in the order it was read.
+    fn party(&self, id: u64) -> Vec<u64> {
+        if !self.marked.contains(&id) {
+            return vec![id];
+        }
+        self.lanes
+            .iter()
+            .flat_map(|l| l.iter())
+            .filter(|c| self.marked.contains(&c.id))
+            .map(|c| c.id)
+            .collect()
+    }
+
+    /// Move the grabbed card — and whoever travels with it — and put
+    /// the keyboard's cursor where they landed.
     fn apply(&mut self, id: u64, lane: usize, slot: usize) {
-        let Some((src, idx)) = self.find(id) else {
-            return;
-        };
-        let card = self.lanes[src].remove(idx);
+        let party = self.party(id);
+        let mut moved = Vec::new();
+        for l in &mut self.lanes {
+            let (take, keep) = std::mem::take(l)
+                .into_iter()
+                .partition(|c: &Card| party.contains(&c.id));
+            *l = keep;
+            moved.extend(take);
+        }
         let slot = slot.min(self.lanes[lane].len());
-        self.lanes[lane].insert(slot, card);
+        for (n, card) in moved.into_iter().enumerate() {
+            self.lanes[lane].insert(slot + n, card);
+        }
         self.cursor = (lane, slot);
     }
 
@@ -171,6 +201,13 @@ impl App {
                     self.sort.lift(card.id);
                 }
             }
+            KeyCode::Char('x') => {
+                if let Some(card) = self.lanes[l].get(i)
+                    && !self.marked.remove(&card.id)
+                {
+                    self.marked.insert(card.id);
+                }
+            }
             KeyCode::Char('q') | KeyCode::Esc => return true,
             _ => {}
         }
@@ -195,6 +232,9 @@ impl App {
         // registered below, after the question is asked.
         let over = self.sort.over();
         let held = self.sort.held().copied();
+        // Everything travelling with the grab leaves the flow, not just
+        // the card in hand.
+        let lifting = held.map(|id| self.party(id)).unwrap_or_default();
 
         for (li, cards) in self.lanes.iter().enumerate() {
             let block = Block::bordered()
@@ -213,7 +253,7 @@ impl App {
             let mut spots: Vec<(u64, Rect)> = Vec::new();
             let mut row = 0u16;
             for (i, card) in cards.iter().enumerate() {
-                if held == Some(card.id) {
+                if lifting.contains(&card.id) {
                     continue;
                 }
                 let mut shown = row;
@@ -225,6 +265,8 @@ impl App {
                 if r.height >= 2 {
                     let edge = if held.is_none() && self.cursor == (li, i) {
                         Color::White
+                    } else if self.marked.contains(&card.id) {
+                        Color::Magenta
                     } else {
                         Color::Gray
                     };
@@ -242,7 +284,7 @@ impl App {
                     match self.sort.carried().copied().and_then(|id| self.text_of(id)) {
                         // Carried by the keyboard: the card itself sits in
                         // the gap and moves with it.
-                        Some(text) => draw_card(f, r, &text, Color::Yellow),
+                        Some(text) => draw_card(f, r, &label(&text, lifting.len()), Color::Yellow),
                         // Hanging from the mouse: the gap is a hole, the
                         // card rides the cursor.
                         None => f.render_widget(
@@ -260,13 +302,13 @@ impl App {
             && let Some(text) = held.and_then(|id| self.text_of(id))
         {
             f.render_widget(Clear, g);
-            draw_card(f, g, &text, Color::Yellow);
+            draw_card(f, g, &label(&text, lifting.len()), Color::Yellow);
         }
 
         let hint = if self.sort.held().is_some() {
             " carrying: arrows move · space drops · esc lets go"
         } else {
-            " drag with the mouse, or: arrows move · space lifts · q quits and prints JSON"
+            " drag with the mouse, or: arrows move · space lifts · x marks · q quits and prints JSON"
         };
         f.render_widget(
             Paragraph::new(hint).style(Style::default().fg(Color::DarkGray)),
@@ -276,6 +318,14 @@ impl App {
 
     fn text_of(&self, id: u64) -> Option<String> {
         self.find(id).map(|(l, i)| self.lanes[l][i].text.clone())
+    }
+}
+
+/// What the card in hand says: its own text, and how many came along.
+fn label(text: &str, lifting: usize) -> String {
+    match lifting {
+        0 | 1 => text.to_string(),
+        n => format!("{text} ×{n}"),
     }
 }
 

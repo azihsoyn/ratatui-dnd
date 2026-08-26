@@ -1,7 +1,6 @@
 //! Sorting for things you already draw.
 //!
-//! [SortableJS](https://github.com/SortableJS/Sortable) for the terminal:
-//! this crate does not own your list, your kanban, or your grid. You keep
+//! This crate does not own your list, your kanban, or your grid. You keep
 //! drawing them however you do — with raw `Layout`, ratatui's `List`, or
 //! any widget that can say where its rows ended up — and register those
 //! rectangles each frame. In return you get lift, a ghost, the gap where

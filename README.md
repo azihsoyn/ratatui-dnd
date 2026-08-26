@@ -5,10 +5,9 @@ you already draw, with mouse or keyboard.
 
 ![a card dragged with the mouse, then carried with the keyboard, then the board printed as JSON](demo.gif)
 
-Think [SortableJS](https://github.com/SortableJS/Sortable), but for the
-terminal. This crate does not own your list, your kanban, or your grid —
-you keep drawing them however you do, with raw `Layout`, ratatui's own
-`List`, or any widget that can say where its rows ended up. You register
+This crate does not own your list, your kanban, or your grid — you keep
+drawing them however you do, with raw `Layout`, ratatui's own `List`, or
+any widget that can say where its rows ended up. You register
 those rectangles each frame, and in return you get lift, a ghost that
 hangs from the grab point, the gap where a drop would land, and the drop
 itself, already resolved to a container and a slot.
@@ -17,12 +16,18 @@ itself, already resolved to a container and a slot.
   actually drew, so vertical lists of any row heights, horizontal
   strips, and row-major grids all work from one rule, without being
   told which one they are.
-- **Containers are first-class.** Drag between columns, drop just past
-  a border and still land in the nearest container — what SortableJS
-  calls a group.
+- **Containers are first-class.** Drag between columns, and drop just
+  past a border and still land in the nearest container.
 - **Keyboard, too.** Everything a mouse drag does can be done without a
   mouse: lift, step the item through slots and across containers, drop,
   or let go.
+- **Scrolled views fit.** A scrolled list can only register what is on
+  screen; register that window and the index it starts at, and slots
+  still come back in full-list terms.
+- **Several at once.** The crate holds one handle; what a grab takes
+  along is your model's business. Keep a selection, leave the whole
+  selection out of what you register while one of it is held, and move
+  all of it where the drop says — the kanban example does this with `x`.
 - **Machine-friendly.** With the `serde` feature the resolved events
   serialize, and the kanban example reads a board as JSON and prints
   the sorted board back — a program can hand a pile of work to a human,
@@ -69,9 +74,10 @@ Two layers, kept apart on purpose:
 ## Examples
 
 ```sh
-cargo run --example kanban   # three lanes; also reads/prints the board as JSON
+cargo run --example kanban   # three lanes, multi-select with x; reads/prints the board as JSON
 cargo run --example list     # ratatui's own List widget, made sortable
 cargo run --example grid     # a row-major grid, same rule as a list
+cargo run --example scroll   # a long list inside tui-scrollview, wheel and all
 ```
 
 Every example speaks both mouse (drag things) and keyboard (arrows move,

@@ -1,9 +1,9 @@
 //! Sorting, built on the ground floor.
 //!
-//! What SortableJS calls a group lives here: containers you can drag
-//! between, insertion slots measured from the rectangles you actually
-//! drew, and a keyboard carry that does what a mouse drag does without
-//! a mouse. Rendering stays with the caller; while something is held,
+//! Containers you can drag between, insertion slots measured from the
+//! rectangles you actually drew, and a keyboard carry that does what a
+//! mouse drag does without a mouse.
+//! Rendering stays with the caller; while something is held,
 //! leave it out of what you register, and ask [`Sortable::over`] where
 //! to open the gap.
 
@@ -60,6 +60,10 @@ struct Con<C, K> {
     id: C,
     area: Rect,
     items: Vec<(K, Rect)>,
+    /// Index the first registered item has in the container's full
+    /// list. A scrolled view registers only what is on screen; slots
+    /// still come back in full-list terms.
+    start: usize,
 }
 
 /// Something held by the keyboard rather than the mouse. It has no
@@ -99,15 +103,27 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
     /// order containers were first registered in is the order the
     /// keyboard walks them in.
     pub fn container(&mut self, id: C, area: Rect, items: &[(K, Rect)]) {
+        self.window(id, area, items, 0);
+    }
+
+    /// [`container`](Self::container) for a scrolled view: only what is
+    /// on screen can be registered, so say what index the first
+    /// registered item has in the full list. Slots keep coming back in
+    /// full-list terms, and a keyboard carry may step one past either
+    /// edge of the window — scroll to keep the gap visible and the
+    /// window follows it.
+    pub fn window(&mut self, id: C, area: Rect, items: &[(K, Rect)], start: usize) {
         match self.cons.iter_mut().find(|c| c.id == id) {
             Some(c) => {
                 c.area = area;
                 c.items = items.to_vec();
+                c.start = start;
             }
             None => self.cons.push(Con {
                 id,
                 area,
                 items: items.to_vec(),
+                start,
             }),
         }
     }
@@ -147,7 +163,7 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
                 self.carry = Some(Carry {
                     key,
                     con: ci,
-                    slot: i,
+                    slot: con.start + i,
                 });
                 return;
             }
@@ -159,8 +175,11 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
     /// walks a grid by rows.
     pub fn shift(&mut self, delta: isize) {
         let Some(c) = &mut self.carry else { return };
-        let len = self.cons.get(c.con).map_or(0, |con| con.items.len());
-        c.slot = (c.slot as isize + delta).clamp(0, len as isize) as usize;
+        let end = self
+            .cons
+            .get(c.con)
+            .map_or(0, |con| con.start + con.items.len());
+        c.slot = (c.slot as isize + delta).clamp(0, end as isize) as usize;
     }
 
     /// Step a carried thing to another container, keeping its slot
@@ -171,7 +190,8 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
             return;
         }
         c.con = (c.con as isize + delta).clamp(0, self.cons.len() as isize - 1) as usize;
-        c.slot = c.slot.min(self.cons[c.con].items.len());
+        let to = &self.cons[c.con];
+        c.slot = c.slot.clamp(to.start, to.start + to.items.len());
     }
 
     /// Put a carried thing down where it is. The caller moves its own
@@ -224,7 +244,7 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
     fn place(&self, x: u16, y: u16) -> Option<(C, usize)> {
         let con = self.cons.iter().min_by_key(|c| distance(c.area, x, y))?;
         let rects: Vec<Rect> = con.items.iter().map(|(_, r)| *r).collect();
-        Some((con.id.clone(), slot(&rects, x, y)))
+        Some((con.id.clone(), con.start + slot(&rects, x, y)))
     }
 
     fn hit(&self, x: u16, y: u16) -> Option<(K, Rect)> {
@@ -396,6 +416,39 @@ mod tests {
         assert_eq!(s.over(), Some(("right", 0)));
         assert_eq!(s.put(), Some((2, "right", 0)));
         assert!(s.held().is_none());
+    }
+
+    #[test]
+    fn a_scrolled_window_answers_in_full_list_terms() {
+        let mut s: Sortable<&'static str, u8> = Sortable::new();
+        // Rows 6..9 of a longer list are what is on screen.
+        s.window(
+            "list",
+            Rect::new(0, 0, 20, 3),
+            &[
+                (6, Rect::new(0, 0, 20, 1)),
+                (7, Rect::new(0, 1, 20, 1)),
+                (8, Rect::new(0, 2, 20, 1)),
+            ],
+            6,
+        );
+        // A mouse drop lands where the row really is in the full list.
+        s.on_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 5, 0));
+        s.on_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), 5, 1));
+        assert_eq!(
+            s.on_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 5, 1)),
+            Act::Drop {
+                key: 6,
+                container: "list",
+                slot: 8
+            }
+        );
+        // A carry starts at its full-list index and can step one past
+        // the bottom of the window, where scrolling will catch up.
+        s.lift(7);
+        assert_eq!(s.over(), Some(("list", 7)));
+        s.shift(100);
+        assert_eq!(s.over(), Some(("list", 9)));
     }
 
     #[test]
