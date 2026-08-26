@@ -312,7 +312,7 @@ impl App {
         let hint = if self.sort.held().is_some() {
             " carrying: arrows move · space drops · esc lets go"
         } else {
-            " drag with the mouse, or: arrows move · space lifts · x marks · q quits and prints JSON"
+            " drag, or: arrows · space lifts · x marks · q quits + prints JSON"
         };
         // The hook stream, narrated: grab, target, drop, cancel, click
         // arrive as data whether the mouse or the keyboard did it.
