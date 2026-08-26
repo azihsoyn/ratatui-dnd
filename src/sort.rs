@@ -360,8 +360,20 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
     /// Where to draw the mouse-held thing, hanging from its grab point.
     /// A keyboard carry has no cursor and no ghost: the gap is where it
     /// is.
+    ///
+    /// This is only a suggestion — the same size as what was grabbed,
+    /// kept inside `within`. What gets drawn there, or whether anything
+    /// does, is the caller's; for a ghost of a different size, anchor
+    /// on [`cursor`](Self::cursor) instead.
     pub fn ghost(&self, within: Rect) -> Option<Rect> {
         self.drag.ghost(within)
+    }
+
+    /// Where the mouse is, while it holds something. For drawing a
+    /// ghost of your own shape — a badge, a count, a shrunken card —
+    /// anchored to the hand rather than to what it grabbed.
+    pub fn cursor(&self) -> Option<(u16, u16)> {
+        self.drag.cursor()
     }
 
     /// The container under this cell, or the nearest one — a drop just
