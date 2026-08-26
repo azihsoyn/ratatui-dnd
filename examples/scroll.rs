@@ -117,7 +117,7 @@ impl App {
             match code {
                 KeyCode::Up | KeyCode::Char('k') => self.sort.shift(-1),
                 KeyCode::Down | KeyCode::Char('j') => self.sort.shift(1),
-                KeyCode::Char(' ') | KeyCode::Enter => {
+                KeyCode::Char(' ') | KeyCode::Char('　') | KeyCode::Enter => {
                     if let Some((id, _, slot)) = self.sort.put() {
                         self.apply(id, slot);
                     }
@@ -141,7 +141,7 @@ impl App {
             }
             KeyCode::PageUp => self.scroll.scroll_page_up(),
             KeyCode::PageDown => self.scroll.scroll_page_down(),
-            KeyCode::Char(' ') | KeyCode::Enter => {
+            KeyCode::Char(' ') | KeyCode::Char('　') | KeyCode::Enter => {
                 if let Some((id, _)) = self.rows.get(self.cursor) {
                     self.sort.lift(*id);
                 }

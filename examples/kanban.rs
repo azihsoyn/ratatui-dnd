@@ -176,7 +176,7 @@ impl App {
                 KeyCode::Down | KeyCode::Char('j') => self.sort.shift(1),
                 KeyCode::Left | KeyCode::Char('h') => self.sort.shift_container(-1),
                 KeyCode::Right | KeyCode::Char('l') => self.sort.shift_container(1),
-                KeyCode::Char(' ') | KeyCode::Enter => {
+                KeyCode::Char(' ') | KeyCode::Char('　') | KeyCode::Enter => {
                     if let Some((id, lane, slot)) = self.sort.put() {
                         self.apply(id, lane, slot);
                     }
@@ -196,7 +196,7 @@ impl App {
             KeyCode::Right | KeyCode::Char('l') if l + 1 < self.lanes.len() => {
                 self.step_lane(l + 1);
             }
-            KeyCode::Char(' ') | KeyCode::Enter => {
+            KeyCode::Char(' ') | KeyCode::Char('　') | KeyCode::Enter => {
                 if let Some(card) = self.lanes[l].get(i) {
                     self.sort.lift(card.id);
                 }

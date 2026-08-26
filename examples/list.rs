@@ -77,7 +77,7 @@ impl App {
             match code {
                 KeyCode::Up | KeyCode::Char('k') => self.sort.shift(-1),
                 KeyCode::Down | KeyCode::Char('j') => self.sort.shift(1),
-                KeyCode::Char(' ') | KeyCode::Enter => {
+                KeyCode::Char(' ') | KeyCode::Char('　') | KeyCode::Enter => {
                     if let Some((id, _, slot)) = self.sort.put() {
                         self.apply(id, slot);
                     }
@@ -90,7 +90,7 @@ impl App {
         match code {
             KeyCode::Up | KeyCode::Char('k') => self.state.select_previous(),
             KeyCode::Down | KeyCode::Char('j') => self.state.select_next(),
-            KeyCode::Char(' ') | KeyCode::Enter => {
+            KeyCode::Char(' ') | KeyCode::Char('　') | KeyCode::Enter => {
                 if let Some((id, _)) = self.state.selected().and_then(|i| self.rows.get(i)) {
                     self.sort.lift(*id);
                 }

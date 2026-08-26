@@ -81,7 +81,7 @@ impl App {
                 KeyCode::Right | KeyCode::Char('l') => self.sort.shift(1),
                 KeyCode::Up | KeyCode::Char('k') => self.sort.shift(-COLS),
                 KeyCode::Down | KeyCode::Char('j') => self.sort.shift(COLS),
-                KeyCode::Char(' ') | KeyCode::Enter => {
+                KeyCode::Char(' ') | KeyCode::Char('　') | KeyCode::Enter => {
                     if let Some((id, _, slot)) = self.sort.put() {
                         self.apply(id, slot);
                     }
@@ -101,7 +101,7 @@ impl App {
             KeyCode::Down | KeyCode::Char('j') => {
                 self.cursor = (self.cursor + COLS as usize).min(last);
             }
-            KeyCode::Char(' ') | KeyCode::Enter => {
+            KeyCode::Char(' ') | KeyCode::Char('　') | KeyCode::Enter => {
                 if let Some((id, ..)) = self.tiles.get(self.cursor) {
                     self.sort.lift(*id);
                 }
