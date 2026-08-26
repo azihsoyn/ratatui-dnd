@@ -56,6 +56,34 @@ pub enum Act<C, K> {
     Drop { key: K, container: C, slot: usize },
 }
 
+/// What happened, told after the fact: the hook side of the crate.
+///
+/// Everything a drag does — by mouse or keyboard — is also queued here
+/// as data, for whoever wants to watch rather than steer: an undo log,
+/// autosave, a sound, a peer to sync. Drain with
+/// [`Sortable::hooks`] once a frame. `from` is where the held thing
+/// was picked up; [`Hook::Target`] fires once each time the gap moves
+/// to a new place, not on every mouse event.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub enum Hook<C, K> {
+    /// Something was picked up, by either hand.
+    Grab { key: K, from: Option<(C, usize)> },
+    /// The gap moved: the held thing now hovers over this place.
+    Target { key: K, container: C, slot: usize },
+    /// Put down here, having come from there.
+    Drop {
+        key: K,
+        from: Option<(C, usize)>,
+        container: C,
+        slot: usize,
+    },
+    /// Let go without a drop — esc, or a mouse press ending a carry.
+    Cancel { key: K },
+    /// Pressed and released without ever dragging.
+    Click { key: K },
+}
+
 struct Con<C, K> {
     id: C,
     area: Rect,
@@ -87,6 +115,13 @@ pub struct Sortable<C, K> {
     drag: Drag<K>,
     carry: Option<Carry<K>>,
     cons: Vec<Con<C, K>>,
+    /// The story so far, waiting to be drained by [`hooks`](Self::hooks).
+    queue: Vec<Hook<C, K>>,
+    /// Where the held thing was picked up.
+    from: Option<(C, usize)>,
+    /// The last place a [`Hook::Target`] was told about, so the gap
+    /// moving reports once per move rather than once per event.
+    aimed: Option<(C, usize)>,
 }
 
 impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
@@ -95,6 +130,39 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
             drag: Drag::new(),
             carry: None,
             cons: Vec::new(),
+            queue: Vec::new(),
+            from: None,
+            aimed: None,
+        }
+    }
+
+    /// Everything that happened since the last drain, in order. Call
+    /// once a frame; what you do with it — log, save, sync, nothing —
+    /// is yours.
+    pub fn hooks(&mut self) -> Vec<Hook<C, K>> {
+        std::mem::take(&mut self.queue)
+    }
+
+    /// Where this key was last registered, in full-list terms.
+    fn locate(&self, key: &K) -> Option<(C, usize)> {
+        self.cons.iter().find_map(|con| {
+            con.items
+                .iter()
+                .position(|(k, _)| k == key)
+                .map(|i| (con.id.clone(), con.start + i))
+        })
+    }
+
+    /// Report the gap's place if it moved since last reported.
+    fn aim(&mut self, key: K) {
+        let Some(t) = self.over() else { return };
+        if self.aimed.as_ref() != Some(&t) {
+            self.aimed = Some(t.clone());
+            self.queue.push(Hook::Target {
+                key,
+                container: t.0,
+                slot: t.1,
+            });
         }
     }
 
@@ -132,23 +200,57 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
     /// resolved to the container and slot it means.
     pub fn on_mouse(&mut self, ev: MouseEvent) -> Act<C, K> {
         // The mouse takes precedence: pressing anywhere ends a carry.
-        if matches!(ev.kind, MouseEventKind::Down(MouseButton::Left)) {
-            self.carry = None;
+        if matches!(ev.kind, MouseEventKind::Down(MouseButton::Left))
+            && let Some(c) = self.carry.take()
+        {
+            self.queue.push(Hook::Cancel { key: c.key });
+            self.aimed = None;
+            self.from = None;
         }
         let hit = self.hit(ev.column, ev.row);
         match self.drag.on_mouse(ev, hit) {
             Did::Nothing => Act::Nothing,
-            Did::Click(k) => Act::Click(k),
-            Did::Lift(k) => Act::Lift(k),
-            Did::Move => Act::Move,
-            Did::Drop { key, x, y } => match self.place(x, y) {
-                Some((container, slot)) => Act::Drop {
-                    key,
-                    container,
-                    slot,
-                },
-                None => Act::Nothing,
-            },
+            Did::Click(k) => {
+                self.queue.push(Hook::Click { key: k.clone() });
+                Act::Click(k)
+            }
+            Did::Lift(k) => {
+                self.from = self.locate(&k);
+                self.queue.push(Hook::Grab {
+                    key: k.clone(),
+                    from: self.from.clone(),
+                });
+                self.aim(k.clone());
+                Act::Lift(k)
+            }
+            Did::Move => {
+                if let Some(k) = self.drag.moving().cloned() {
+                    self.aim(k);
+                }
+                Act::Move
+            }
+            Did::Drop { key, x, y } => {
+                self.aimed = None;
+                match self.place(x, y) {
+                    Some((container, slot)) => {
+                        self.queue.push(Hook::Drop {
+                            key: key.clone(),
+                            from: self.from.take(),
+                            container: container.clone(),
+                            slot,
+                        });
+                        Act::Drop {
+                            key,
+                            container,
+                            slot,
+                        }
+                    }
+                    None => {
+                        self.from = None;
+                        Act::Nothing
+                    }
+                }
+            }
         }
     }
 
@@ -160,11 +262,17 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
         }
         for (ci, con) in self.cons.iter().enumerate() {
             if let Some(i) = con.items.iter().position(|(k, _)| *k == key) {
+                self.from = Some((con.id.clone(), con.start + i));
                 self.carry = Some(Carry {
-                    key,
+                    key: key.clone(),
                     con: ci,
                     slot: con.start + i,
                 });
+                self.queue.push(Hook::Grab {
+                    key: key.clone(),
+                    from: self.from.clone(),
+                });
+                self.aim(key);
                 return;
             }
         }
@@ -180,6 +288,8 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
             .get(c.con)
             .map_or(0, |con| con.start + con.items.len());
         c.slot = (c.slot as isize + delta).clamp(0, end as isize) as usize;
+        let key = c.key.clone();
+        self.aim(key);
     }
 
     /// Step a carried thing to another container, keeping its slot
@@ -192,6 +302,8 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
         c.con = (c.con as isize + delta).clamp(0, self.cons.len() as isize - 1) as usize;
         let to = &self.cons[c.con];
         c.slot = c.slot.clamp(to.start, to.start + to.items.len());
+        let key = c.key.clone();
+        self.aim(key);
     }
 
     /// Put a carried thing down where it is. The caller moves its own
@@ -199,14 +311,27 @@ impl<C: Clone + PartialEq, K: Clone + PartialEq> Sortable<C, K> {
     /// a frame old.
     pub fn put(&mut self) -> Option<(K, C, usize)> {
         let c = self.carry.take()?;
+        self.aimed = None;
+        let from = self.from.take();
         let id = self.cons.get(c.con)?.id.clone();
+        self.queue.push(Hook::Drop {
+            key: c.key.clone(),
+            from,
+            container: id.clone(),
+            slot: c.slot,
+        });
         Some((c.key, id, c.slot))
     }
 
     /// Let go of whatever is held — mouse or keyboard — without a drop.
     pub fn cancel(&mut self) {
+        if let Some(k) = self.held().cloned() {
+            self.queue.push(Hook::Cancel { key: k });
+        }
         self.carry = None;
         self.drag.cancel();
+        self.from = None;
+        self.aimed = None;
     }
 
     /// What is held right now, by either hand.
@@ -416,6 +541,85 @@ mod tests {
         assert_eq!(s.over(), Some(("right", 0)));
         assert_eq!(s.put(), Some((2, "right", 0)));
         assert!(s.held().is_none());
+    }
+
+    #[test]
+    fn hooks_tell_the_story_of_a_drag() {
+        let mut s = sortable();
+        s.on_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 5, 2));
+        s.on_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), 30, 7));
+        s.on_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), 31, 7));
+        s.on_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 31, 7));
+        assert_eq!(
+            s.hooks(),
+            vec![
+                Hook::Grab {
+                    key: 1,
+                    from: Some(("left", 0))
+                },
+                // The gap moved once; the second, same-place drag event
+                // reported nothing.
+                Hook::Target {
+                    key: 1,
+                    container: "right",
+                    slot: 1
+                },
+                Hook::Drop {
+                    key: 1,
+                    from: Some(("left", 0)),
+                    container: "right",
+                    slot: 1
+                },
+            ]
+        );
+        assert!(s.hooks().is_empty());
+    }
+
+    #[test]
+    fn hooks_tell_the_story_of_a_carry() {
+        let mut s = sortable();
+        s.lift(2);
+        s.shift(-1);
+        s.shift(-1); // already at the top: no new target
+        s.put();
+        assert_eq!(
+            s.hooks(),
+            vec![
+                Hook::Grab {
+                    key: 2,
+                    from: Some(("left", 1))
+                },
+                Hook::Target {
+                    key: 2,
+                    container: "left",
+                    slot: 1
+                },
+                Hook::Target {
+                    key: 2,
+                    container: "left",
+                    slot: 0
+                },
+                Hook::Drop {
+                    key: 2,
+                    from: Some(("left", 1)),
+                    container: "left",
+                    slot: 0
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_press_that_ends_a_carry_is_a_cancel() {
+        let mut s = sortable();
+        s.lift(2);
+        s.hooks();
+        s.on_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 40, 18));
+        assert_eq!(s.hooks(), vec![Hook::Cancel { key: 2 }]);
+        s.lift(3);
+        s.hooks();
+        s.cancel();
+        assert_eq!(s.hooks(), vec![Hook::Cancel { key: 3 }]);
     }
 
     #[test]

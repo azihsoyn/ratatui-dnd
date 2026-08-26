@@ -62,6 +62,26 @@ sort.shift_container(1);  // next container
 if let Some((key, container, slot)) = sort.put() { /* move it */ }
 ```
 
+Everything that happens is also reported as data — the hook stream:
+
+```rust
+for hook in sort.hooks() {          // drain once a frame
+    match hook {
+        Hook::Grab { key, from } => {}                       // picked up
+        Hook::Target { container, slot, .. } => {}           // the gap moved
+        Hook::Drop { key, from, container, slot } => {}      // put down
+        Hook::Cancel { key } => {}                           // let go
+        Hook::Click { key } => {}                            // never dragged
+    }
+}
+```
+
+Mouse and keyboard feed the same stream, `Target` fires once per move
+rather than once per event, and `from` says where the thing was picked
+up — enough for an undo log, autosave, a sound, or syncing a peer.
+With the `serde` feature, hooks serialize. The kanban example narrates
+its stream in the status line.
+
 Two layers, kept apart on purpose:
 
 - `interact` — the ground floor: a drag state machine over raw mouse

@@ -20,4 +20,4 @@ pub mod interact;
 pub mod sort;
 
 pub use interact::{Did, Drag, Hits};
-pub use sort::{Act, Sortable, slot};
+pub use sort::{Act, Hook, Sortable, slot};

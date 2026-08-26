@@ -20,7 +20,7 @@ use crossterm::event::{
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, BorderType, Clear, Paragraph};
-use ratatui_dnd::{Act, Sortable};
+use ratatui_dnd::{Act, Hook, Sortable};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::time::Duration;
@@ -50,6 +50,9 @@ struct App {
     /// of it takes along is the model's business, so a marked card
     /// dragged anywhere brings the whole marked set.
     marked: HashSet<u64>,
+    /// The last hook, narrated. The status line shows the crate's
+    /// event stream doing its job.
+    log: String,
 }
 
 impl App {
@@ -74,6 +77,7 @@ impl App {
             sort: Sortable::new(),
             cursor: (0, 0),
             marked: HashSet::new(),
+            log: String::new(),
         }
     }
 
@@ -310,14 +314,52 @@ impl App {
         } else {
             " drag with the mouse, or: arrows move · space lifts · x marks · q quits and prints JSON"
         };
+        // The hook stream, narrated: grab, target, drop, cancel, click
+        // arrive as data whether the mouse or the keyboard did it.
+        if let Some(h) = self.sort.hooks().pop() {
+            self.log = tell(&h, &self.titles);
+        }
+        let [left, right] = Layout::horizontal([
+            Constraint::Fill(1),
+            Constraint::Length(self.log.len() as u16),
+        ])
+        .areas(status);
         f.render_widget(
             Paragraph::new(hint).style(Style::default().fg(Color::DarkGray)),
-            status,
+            left,
+        );
+        f.render_widget(
+            Paragraph::new(self.log.as_str()).style(Style::default().fg(Color::DarkGray)),
+            right,
         );
     }
 
     fn text_of(&self, id: u64) -> Option<String> {
         self.find(id).map(|(l, i)| self.lanes[l][i].text.clone())
+    }
+}
+
+/// One hook as a status-line phrase.
+fn tell(h: &Hook<usize, u64>, titles: &[String]) -> String {
+    let at = |p: &Option<(usize, usize)>| match p {
+        Some((c, s)) => format!(" from {}:{s}", titles[*c]),
+        None => String::new(),
+    };
+    match h {
+        Hook::Grab { key, from } => format!("grab #{key}{} ", at(from)),
+        Hook::Target {
+            container, slot, ..
+        } => format!("over {}:{slot} ", titles[*container]),
+        Hook::Drop {
+            key,
+            from,
+            container,
+            slot,
+        } => {
+            format!("drop #{key}{} at {}:{slot} ", at(from), titles[*container])
+        }
+        Hook::Cancel { key } => format!("let go of #{key} "),
+        Hook::Click { key } => format!("click #{key} "),
     }
 }
 
