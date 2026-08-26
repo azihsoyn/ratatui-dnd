@@ -78,7 +78,15 @@ cargo run --example kanban   # three lanes, multi-select with x; reads/prints th
 cargo run --example list     # ratatui's own List widget, made sortable
 cargo run --example grid     # a row-major grid, same rule as a list
 cargo run --example scroll   # a long list inside tui-scrollview, wheel and all
+cargo run --example handrolled  # list.rs with the crate left out — read them side by side
 ```
+
+`list.rs` and `handrolled.rs` are the same app, line for line, except
+that one uses this crate and the other writes the drag out by hand.
+The difference — a mouse state machine, hit testing, midline
+arithmetic, a clamped ghost, and a second holding state for the
+keyboard, ~170 lines for even this smallest case — is what the crate
+is for.
 
 Every example speaks both mouse (drag things) and keyboard (arrows move,
 space lifts and drops, esc lets go).
