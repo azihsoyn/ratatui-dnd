@@ -17,6 +17,10 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 [features]
 serde = ["dep:serde"]
 
+[[example]]
+name = "headless"
+required-features = ["serde"]
+
 [dev-dependencies]
 anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }

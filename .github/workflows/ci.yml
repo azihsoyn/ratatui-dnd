@@ -21,4 +21,7 @@ jobs:
       - run: cargo clippy --all-targets --features serde -- -D warnings
       - run: cargo test --features serde
       - run: cargo test
-      - run: cargo build --examples
+      - run: cargo build --examples --features serde
+      - run: |
+          echo '{"board":[{"title":"todo","cards":["a","b"]},{"title":"done","cards":[]}],"script":[{"down":[2,1]},{"drag":[33,2]},{"up":[33,2]}]}' \
+            | cargo run -q --example headless --features serde

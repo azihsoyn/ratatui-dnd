@@ -99,7 +99,13 @@ cargo run --example list     # ratatui's own List widget, made sortable
 cargo run --example grid     # a row-major grid, same rule as a list
 cargo run --example scroll   # a long list inside tui-scrollview, wheel and all
 cargo run --example handrolled  # list.rs with the crate left out — read them side by side
+cargo run --example headless --features serde  # JSON in, hooks + board out, no terminal
 ```
+
+The headless example is the machine's door: pipe it a board and a
+script of events as JSON and it replays them without a terminal,
+printing every hook and the final board as JSON — how a program or an
+AI verifies a drag.
 
 `list.rs` and `handrolled.rs` are the same app, line for line, except
 that one uses this crate and the other writes the drag out by hand.
